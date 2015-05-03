@@ -5,6 +5,7 @@ import unittest
 import struct
 import sys
 debug = True
+Mute = False
 #= Notes =
 #secret control block FF 07 80 69
 
@@ -80,7 +81,7 @@ class RfCardReader():
 
     def beep(self,freq=1, duration=3):
         tmpbuff = create_string_buffer("",1)
-        ControlBuzzer(freq,duration,tmpbuff)
+        if not Mute : ControlBuzzer(freq,duration,tmpbuff)
         if tmpbuff[0] == 0:
             return True
         else:
