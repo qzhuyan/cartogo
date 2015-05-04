@@ -37,14 +37,14 @@ class MainFrame(wx.Frame):
         panel.SetBackgroundColour(wx.Colour(192, 222, 237))
         self.rf = CarToGoRF()
     
-        TopLB = wx.StaticText(panel, -1, u"租借登记系统")        
+        TopLB = wx.StaticText(panel, -1, u"租借登记系统 - 演示版")        
         TopLB.SetFont(wx.Font(28, wx.SWISS, wx.NORMAL, wx.BOLD))
         
 
         # #left top: customer
         CustomerS = wx.StaticText(panel, -1, u"客户名称")
 
-        #CustomerC = wx.TextCtrl(panel, -1, "",size=(200,-1))
+        
         CustomerC = wx.StaticText(panel, -1, "")
         CustomerNumS = wx.StaticText(panel, -1, u"客户号")
      
@@ -72,7 +72,8 @@ class MainFrame(wx.Frame):
                   'carid': CarNumC,
                   'rent': TimeRentC,
                   'return' : TimeReturnC,
-                  'cardid': CardNumC
+                  'cardid': CardNumC,
+                  'cutext':CustomerC
                   }
 
         self.DisplayObjs = [CustomerS,CustomerNumS,CarNumS,TimeRentS,
@@ -198,11 +199,12 @@ class MainFrame(wx.Frame):
     def stateinit(self):#init state machine
         self.bg_wait_for_card()
         for (k,o) in self.MOs.items():
-            if k != 'cardid':
+            if k != 'cardid' and k != 'cutext':
                 o.SetEditable(False)
                 o.SetValue("")
         self.SetState("IDLE")
         self.MOs['cardid'].SetLabel(u"无卡")
+        self.MOs['cutext'].SetLabel(u"")
 
        
     def SetState(self,State):
@@ -289,13 +291,19 @@ class MainFrame(wx.Frame):
                 self.show_info_dialog(u"空卡请先注册！")
 
             CUText = db_query_customer(id)
-            self.dialog = wx.TextEntryDialog(None,u"是否现在租车给 %s ?" % (CUText), "rent car now?")
+            self.dialog = wx.TextEntryDialog(None,u"%s公司租车 ?" % (CUText), "rent car now?")
             self.dialog.Bind(wx.EVT_CHAR_HOOK, self.onDialogKey)
-            if wx.ID_OK == self.dialog.ShowModal():
-                Rf = self.action_rent_car()
+
+            Choice = self.dialog.ShowModal()
             self.dialog.Destroy()
-            self.show_info_dialog(u"租车成功，请取卡！")
-            self.wait_for_remove_card(Rf.cardid)
+
+            if wx.ID_OK == Choice :
+                Rf = self.action_rent_car()
+                
+                self.show_info_dialog(u"%s公司于%s租车成功，请取卡！" % (CUText,datetime.fromtimestamp(Rf.borrowtag).strftime(TIMEFMT)))
+                self.wait_for_remove_card(Rf.cardid)
+            else:
+                self.show_info_dialog(u"租车已取消！")         
             self.stateinit()
 
         elif State == "DIALOGIFREG" and Evt == wx.ID_CANCEL:
@@ -362,7 +370,8 @@ class MainFrame(wx.Frame):
                 if debug: print "borrowtag:"+str(Rf.borrowtag)
                 renttime = datetime.fromtimestamp(Rf.borrowtag).strftime(TIMEFMT)
                 self.MOs['rent'].SetValue(renttime)
-                self.dialog = wx.TextEntryDialog(None,u"是否现在还车?" , "return car now?")
+                CUText = db_query_customer(Rf.clientid)
+                self.dialog = wx.TextEntryDialog(None,u"%s公司现在还车?" % (CUText) , "return car now?")
                 self.dialog.Bind(wx.EVT_CHAR_HOOK, self.onDialogKey)
                 select = self.dialog.ShowModal()
                 self.dialog.Destroy()
@@ -379,6 +388,7 @@ class MainFrame(wx.Frame):
         #todo
         (ret,rf) = CarToGoRF().get()
         if ret != -1:
+            rf.clientid = int(self.MOs['cuid'].GetValue())
             rf.borrowtag = time()
             rf.update()
             self.rf.beep(beepf,beepd)
@@ -389,11 +399,14 @@ class MainFrame(wx.Frame):
         
 
     def action_return_car(self,Rf):
-        self.MOs['return'].SetValue(datetime.fromtimestamp(time()).strftime(TIMEFMT))
+        returntime = datetime.fromtimestamp(time()).strftime(TIMEFMT)
+        self.MOs['return'].SetValue(returntime)
         if 0 != CarToGoRF().reset():
             raise Exception('action_return_car_fail')
         self.rf.beep(beepf,beepd)
-        self.show_info_dialog(u"还车成功，请取卡！")
+        CUText = db_query_customer(Rf.clientid)
+        self.MOs['cutext'].SetLabel(CUText)
+        self.show_info_dialog(u"%s公司，客户号:%s 于 %s 还车成功，请取卡！" %(CUText,str(Rf.clientid),returntime))
         self.wait_for_remove_card(Rf.cardid)
         #todo
         #write_to_db
@@ -429,7 +442,7 @@ def verify_password_ok(rawtext):
 
 def db_query_customer(id):
     #todo
-    return "China Mobile"
+    return "xx"
 
 class cartogoApp(wx.App):
     def __init__(self, redirect=False, filename=None,
