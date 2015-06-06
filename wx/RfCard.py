@@ -5,7 +5,8 @@ import unittest
 import struct
 import sys
 debug = True
-Mute = False
+#Mute = False
+Mute = True
 #= Notes =
 #secret control block FF 07 80 69
 
@@ -91,13 +92,13 @@ class RfCardReader():
 ## [unsigned int carid, unsigned int clientid,
 ##        float timeborrow, float timereturn]
 class CarToGoRF(RfCardReader):
-    dataformat='IIff'
+    dataformat='IIdd'
     def __init__(self,pwd='\xff\xff\xff\xff\xff\xff',carid=0,clientid=0):
         self.pwd = pwd #todo pwd length check
         self.carid = int(carid)
         self.clientid = int(clientid)
-        self.borrowtag = 0
-        self.returntag = 0
+        self.borrowtag = float(0)
+        self.returntag = float(0)
 
     def set_carid(self, carid):
         self.carid = carid
@@ -169,20 +170,40 @@ class CarToGORFTest(unittest.TestCase):
     def test_encode(self):
         T= CarToGoRF("123456",100,99)
         self.assertEqual(T.encode(),'d\x00\x00\x00c\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00')
-
+        
     def test_update(self):
         T = CarToGoRF("\xff\xff\xff\xff\xff\xff",100,99)
+        T.borrowtag = 345.23753
         self.assertEqual(T.update(), 0)
+        (Errno,BD) = T.get()
+        self.assertNotEqual(Errno, Error)
+        self.assertEqual(BD.carid, 100)
+        self.assertEqual(BD.clientid, 99)
+        self.assertEqual(BD.returntag, 0)
+        self.assertEqual(BD.borrowtag, 345.23753)
 
     def test_get(self):
         T = CarToGoRF("\xff\xff\xff\xff\xff\xff",100,99)
-        #self.assertEqual(T.update(), 0)
+        self.assertEqual(T.update(), 0)
         (Errno,BD) = T.get()
         self.assertNotEqual(Errno, Error)
         self.assertEqual(BD.carid, 100)
         self.assertEqual(BD.clientid, 99)
         self.assertEqual(BD.returntag, 0)
         self.assertEqual(BD.borrowtag, 0)
+
+    def test_update(self):
+        T = CarToGoRF("\xff\xff\xff\xff\xff\xff",100,99)
+        T.borrowtag = 345.23753
+        self.assertEqual(T.update(), 0)
+        (Errno,BD) = T.get()
+        self.assertNotEqual(Errno, Error)
+        self.assertEqual(BD.carid, 100)
+        self.assertEqual(BD.clientid, 99)
+        self.assertEqual(BD.returntag, 0)
+        self.assertEqual(BD.borrowtag, 345.23753)
+
+        
 
     def test_reset(self):
          T = CarToGoRF("\xff\xff\xff\xff\xff\xff",2000,99)
