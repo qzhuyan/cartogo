@@ -1,9 +1,20 @@
 import couchdb
+from couchdb.mapping import Document, TextField, IntegerField, DateTimeField
+
+class RentDoc(Document):
+    CardId = TextField() 
+    Client = TextField() 
+    Rent   = TextField() 
+    Return = TextField()
+
+class CustomerDoc(Document):
+    name = TextField()
+
+class CardDoc(Document):
+    CarId = TextField()
+    time = TextField()
 
 class server(couchdb.Server):
-    def __init__(self,url):
-        self.server = couchdb.Server(url)
-       
     def save(self,db,Data):
         return self.server[db].save(Data)
 
@@ -21,5 +32,3 @@ class server(couchdb.Server):
 
     
 
-S = server("http://192.168.0.28:5984/")
-print S.get('car2go_rent',"3")

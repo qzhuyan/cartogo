@@ -1,1 +1,5 @@
 wx/cartogo_couchdb.py
+wx/car2goDB.py~
+wx/ui.py~
+*.py~
+*.pyc

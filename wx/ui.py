@@ -12,6 +12,7 @@ from wx.lib.newevent import NewEvent
 import ctypes
 
 import car2goDB
+from car2goDB import RentDoc, CustomerDoc, CardDoc
 
 niceface=""
 
@@ -129,7 +130,7 @@ class MainFrame(wx.Frame):
         self.Center()
 
         self.DisplayObjs = [CustomerS,CustomerNumS,CarNumS,TimeRentS,
-                            TimeReturnS, CardNumS]
+                            CustomerC,TimeReturnS, CardNumS]
                             
         for m in self.DisplayObjs:
             m.SetFont(wx.Font(45, wx.SWISS, wx.NORMAL, wx.BOLD))
@@ -147,12 +148,17 @@ class MainFrame(wx.Frame):
 
         for (k,v) in self.MOs.items():
             if not v == CustomerC:
+                
                 v.SetFont(wx.Font(45, wx.SWISS, wx.NORMAL, wx.BOLD))
+
             
 
 
         self.Bind(wx.EVT_CHAR_HOOK, self.onKey)
-        self.db = car2goDB.server(DBServerUrl)
+        dbserver = car2goDB.server(DBServerUrl)
+        self.dbtab_card = dbserver[CardDB]
+        self.dbtab_customer = dbserver[CustomerDB]
+        self.dbtab_rent = dbserver[RentDB]
         self.MOs['cuid'].Bind(wx.EVT_CHAR_HOOK, self.OnCustomerIdInput)
 
         CustomerC.SetFocus()
@@ -202,6 +208,7 @@ class MainFrame(wx.Frame):
 
     #### Following are about state machine
     def stateinit(self):#init state machine
+        self.rf_reader_online = None
         self.bg_wait_for_card()
         for (k,o) in self.MOs.items():
             if k != 'cardid' and k != 'cutext':
@@ -230,10 +237,19 @@ class MainFrame(wx.Frame):
         reader = self.rf
         CardId = -1
     
-        while CardId == -1 and not self.shutdown:
+        while (CardId == -1 or CardId == "00000000") and not self.shutdown:
             sleep(0.1)
             (CardId, Data) = reader.readhex('\xff\xff\xff\xff\xff\xff',4,1)
-            print Data
+            print CardId,Data
+            if CardId == -1 and Data == "00" and self.rf_reader_online != False:
+                self.MOs['cardid'].SetLabel(u"读卡器未连接")
+                self.rf_reader_online = False
+            else:
+                self.rf_reader_online = True
+                if CardId == -1 and Data == "83":
+                    self.MOs['cardid'].SetLabel(u"无卡")
+            
+                
         self.MOs['cardid'].SetLabel(CardId)
         evt = wxCardInsert()
         wx.PostEvent(self, evt)
@@ -406,16 +422,12 @@ class MainFrame(wx.Frame):
         else:
             raise Exception(('action_rent_car_fail',ret))
 
-        
     def db_rentcar(self, rf):
-        Data = {'_id' : key_rent(rf),
-                'CardId' : rf.cardid,
-                'Client' : rf.clientid,
-                'Rent'   : format_datetime(rf.borrowtag),
-                'Return' : rf.returntag}
-        
-        self.db.save(RentDB,Data)
-        
+        doc = RentDoc(id = key_rent(rf),
+                     CardId = rf.cardid,
+                     Client = self.db_cid_to_cname(rf.clientid),
+                     Rent = format_datetime(rf.borrowtag))
+        doc.store(self.dbtab_rent)
 
     def action_return_car(self,Rf):
         now = time()
@@ -437,19 +449,16 @@ class MainFrame(wx.Frame):
         #write_to_db
 
     def db_return_car(self,rf,time):
-        #todo handle case if we didn't get the rental record
-        
         #query doc with key
-        doc = self.db.get(RentDB,key_rent(rf))
-        #set return time
-        Data = {'_id' : doc['_id'],
-                '_rev' : doc['_rev'],
-                'CardId' : doc['CardId'],
-                'Client' : doc['Client'], 
-                'Rent'   : doc['Rent'],
-                'Return' : format_datetime(time)}
-        
-        self.db.save(RentDB, Data)
+        doc = RentDoc.load(self.dbtab_rent, key_rent(rf))
+
+        if doc:
+            doc.Return = format_datetime(time)
+            doc.store(self.dbtab_rent)
+            return 0
+        else:
+            #todo handle case if we didn't get the rental record
+            return -1
 
     def wait_for_remove_card(self,current):
         CardId = current
@@ -465,21 +474,22 @@ class MainFrame(wx.Frame):
 
         RfCardId = self.CurrentCard
         carnum = self.MOs['carid'].GetValue()
-        Doc = self.db.get(CardDB, str(RfCardId))
-        if Doc == None: #NEW
-            self.db.save(CardDB,{'_id': str(RfCardId), 'carid': str(carnum) })
-        else: #EXISTING
-            Doc['carid'] = str(carnum)
-        
+        doc = CardDoc.load(self.dbtab_card, str(RfCardId))
+        if doc:
+            doc.CarId = str(carnum)
+        else:
+            doc = CardDoc(id = RfCardId, CarId = str(carnum))
+        doc.time =  format_datetime(time())
+        doc.store(self.dbtab_card)
+
         rf = CarToGoRF(pwd=DEF_PWD,carid=self.MOs['carid'].GetValue())
         rf.beep(beepf,2) #todo: shall not beep in state machine
-        
         rf.update()
         return True
     
     def db_cid_to_cname(self,id):
-        #todo if name is not found
-        r = self.db.get(CustomerDB,str(id))
+        #todo what if name is not found?
+        r = CustomerDoc.load(self.dbtab_customer,str(id))
         if None == r:
             return ""
         else:
