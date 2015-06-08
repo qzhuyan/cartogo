@@ -248,7 +248,6 @@ class MainFrame(wx.Frame):
                 self.rf_reader_online = True
                 if CardId == -1 and Data == "83":
                     self.MOs['cardid'].SetLabel(u"无卡")
-            
                 
         self.MOs['cardid'].SetLabel(CardId)
         evt = wxCardInsert()
@@ -270,7 +269,7 @@ class MainFrame(wx.Frame):
 
     def close_me(self):
         self.shutdown = True
-        self.bg.join()
+        self.bg.join(3)
         self.Close()
                
     ###-----------------------    
@@ -394,6 +393,9 @@ class MainFrame(wx.Frame):
                 renttime = datetime.fromtimestamp(Rf.borrowtag).strftime(TIMEFMT)
                 self.MOs['rent'].SetValue(renttime)
                 CUText = self.db_cid_to_cname(Rf.clientid)
+                self.MOs['cuid'].SetValue(str(Rf.clientid))
+                self.MOs['cutext'].SetLabel(CUText)
+
                 self.dialog = wx.TextEntryDialog(None,u"%s公司现在还车?" % (CUText) , "return car now?")
                 self.dialog.Bind(wx.EVT_CHAR_HOOK, self.onDialogKey)
                 select = self.dialog.ShowModal()
@@ -410,8 +412,10 @@ class MainFrame(wx.Frame):
         if debug: print "action_rent_car"
         RentTime = time()
         Client = int(self.MOs['cuid'].GetValue())        
-        #todo
         (ret,rf) = CarToGoRF().get()
+
+        self.MOs['cutext'].SetLabel(self.db_cid_to_cname(rf.clientid))
+        
         if ret != -1:
             rf.clientid = Client
             rf.borrowtag = RentTime
@@ -424,9 +428,10 @@ class MainFrame(wx.Frame):
 
     def db_rentcar(self, rf):
         doc = RentDoc(id = key_rent(rf),
-                     CardId = rf.cardid,
-                     Client = self.db_cid_to_cname(rf.clientid),
-                     Rent = format_datetime(rf.borrowtag))
+                      CardId = rf.cardid,
+                      CarId = self.card_to_car(rf.cardid),
+                      Client = self.db_cid_to_cname(rf.clientid),
+                      Rent = format_datetime(rf.borrowtag))
         doc.store(self.dbtab_rent)
 
     def action_return_car(self,Rf):
@@ -435,6 +440,7 @@ class MainFrame(wx.Frame):
         self.MOs['return'].SetValue(returntime)
         self.rf.beep(beepf,beepd)
         CUText = self.db_cid_to_cname(Rf.clientid)
+        self.MOs['cuid'].SetValue(str(Rf.clientid))
         self.MOs['cutext'].SetLabel(CUText)
 
         self.db_return_car(Rf,now)
@@ -494,6 +500,11 @@ class MainFrame(wx.Frame):
             return ""
         else:
             return r['name']
+
+    def card_to_car(self,cardid):
+        doc = CardDoc.load(self.dbtab_card, str(cardid))
+        if doc:
+            return doc.CarId
 
 def verify_password_ok(rawtext):
     if rawtext=="11":

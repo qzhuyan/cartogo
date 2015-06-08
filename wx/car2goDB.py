@@ -2,7 +2,8 @@ import couchdb
 from couchdb.mapping import Document, TextField, IntegerField, DateTimeField
 
 class RentDoc(Document):
-    CardId = TextField() 
+    CardId = TextField()
+    CarId = TextField()
     Client = TextField() 
     Rent   = TextField() 
     Return = TextField()
