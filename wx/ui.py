@@ -2,8 +2,13 @@
 # coding=utf-8
 
 import wx
+import sys
 
-from RfCard import *
+if sys.platform == 'linux2':
+    from RfCard_linux import *
+else:
+    from RfCard_win import *
+
 from time import sleep
 from time import time
 from datetime import datetime
@@ -35,7 +40,7 @@ COLS = 4
 BORDER = 20
 
 ##DB
-DBServerUrl = 'http://wtwo.no-ip.org:5984/'
+DBServerUrl = 'http://192.168.200.8:34567'
 CardDB = 'car2go_card'
 CustomerDB = 'car2go_customer'
 RentDB = 'car2go_rent'
@@ -521,10 +526,10 @@ class cartogoApp(wx.App):
     def OnInit(self):
         return True
 
-def get_screen_resolution():
-    user32 = ctypes.windll.user32
-    Res = (user32.GetSystemMetrics(0),user32.GetSystemMetrics(1))
-    print "Screen: W:%d H:%d" % Res
+# def get_screen_resolution():
+#     user32 = ctypes.windll.user32
+#     Res = (user32.GetSystemMetrics(0),user32.GetSystemMetrics(1))
+#     print "Screen: W:%d H:%d" % Res
 
 def  pixel_to_pointer(pix):
     return pix * 0.75
@@ -542,12 +547,10 @@ def key_rent(rf):
 
 if __name__ == '__main__':
     print "Welcome to cartogoApp"
-    Size = get_screen_resolution()
+    #Size = get_screen_resolution()
     app = cartogoApp()
     
     frame = MainFrame((1024,768))
     frame.Show(True)
     app.MainLoop()
-
-    
 
