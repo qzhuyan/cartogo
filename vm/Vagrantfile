@@ -83,7 +83,7 @@ EOM
       sudo apt-get install -y docker.engine
       sudo docker pull elasticsearch
       sudo docker pull kibana
-      sudo docker run -p 34567:9200 -d --name elk elasticsearch
+      sudo docker run -p 34567:9200 -d --name elk elasticsearch:1.7.3
       sudo docker run -p 34568:5601 --link elk:elasticsearch --name kibana -d kibana
    SHELL
 end
