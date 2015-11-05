@@ -318,6 +318,11 @@ class MainFrame(wx.Frame):
                 self.show_info_dialog(u"空卡请先注册！")
 
             CUText = self.db_cid_to_cname(id)
+            if not CUText:
+                self.show_info_dialog(u"公司未找到！")
+                self.MOs['cuid'].SetValue("")
+                return 
+        
             self.dialog = wx.TextEntryDialog(None,u"%s公司租车 ?" % (CUText), "rent car now?")
             self.dialog.Bind(wx.EVT_CHAR_HOOK, self.onDialogKey)
 
@@ -418,8 +423,11 @@ class MainFrame(wx.Frame):
         RentTime = time()
         Client = int(self.MOs['cuid'].GetValue())        
         (ret,rf) = CarToGoRF().get()
-
-        self.MOs['cutext'].SetLabel(self.db_cid_to_cname(rf.clientid))
+        cname = self.db_cid_to_cname(Client)
+        if not cname:
+            self.show_info_dialog(u"公司未找到！!")
+            
+        self.MOs['cutext'].SetLabel(cname)
         
         if ret != -1:
             rf.clientid = Client
@@ -462,9 +470,8 @@ class MainFrame(wx.Frame):
     def db_return_car(self,rf,time):
         #query doc with key
         doc = RentDoc.load(self.dbtab_rent, key_rent(rf))
-
         if doc:
-            doc.Return = format_datetime(time)
+            doc['Return'] = format_datetime(time)
             doc.store(self.dbtab_rent)
             return 0
         else:
@@ -487,10 +494,12 @@ class MainFrame(wx.Frame):
         carnum = self.MOs['carid'].GetValue()
         doc = CardDoc.load(self.dbtab_card, str(RfCardId))
         if doc:
-            doc.CarId = str(carnum)
+            doc['CarId'] = str(carnum)
         else:
             doc = CardDoc(id = RfCardId, CarId = str(carnum))
-        doc.time =  format_datetime(time())
+            
+        doc['time'] =  format_datetime(time())
+        
         doc.store(self.dbtab_card)
 
         rf = CarToGoRF(pwd=DEF_PWD,carid=self.MOs['carid'].GetValue())
@@ -498,9 +507,9 @@ class MainFrame(wx.Frame):
         rf.update()
         return True
     
-    def db_cid_to_cname(self,id):
-        #todo what if name is not found?
+    def db_cid_to_cname(self, id):
         r = CustomerDoc.load(self.dbtab_customer,str(id))
+        print "get cname: %s with id : %s" %( r, id)
         if None == r:
             return ""
         else:
